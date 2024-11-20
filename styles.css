@@ -1,0 +1,33 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+  }
+  
+  #video, #canvasOutput {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    transform: scaleX(-1); /* Mirror the video for a selfie view */
+    z-index: 1;
+  }
+  
+  #three-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2; /* Place it above the video and canvas */
+    pointer-events: none; /* Allow interactions to pass through */
+  }
+  
+  @media (orientation: landscape) {
+    #video, #canvasOutput {
+      height: 100%;
+      width: auto;
+    }
+  }
+  
