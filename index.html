@@ -8,18 +8,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 </head>
 <body>
+  <!-- Start button for user interaction -->
+  <button id="startButton">Start Application</button>
+  
   <!-- Video element for camera feed -->
   <video id="video" autoplay playsinline></video>
+  
   <!-- Canvas for OpenCV processing output -->
   <canvas id="canvasOutput"></canvas>
+  
   <!-- Container for Three.js visualization -->
   <div id="three-container"></div>
 
   <!-- Include OpenCV.js and Three.js -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+  <script src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
   <!-- Include OrbitControls for Three.js camera control -->
   <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+  
   <!-- Include your main JavaScript file -->
   <script src="app.js"></script>
 </body>
