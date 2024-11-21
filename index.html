@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-    <h1>ArUco Marker Detection v2</h1>
+    <h1>ArUco Marker Detection v3</h1>
     <button id="enableCameraButton">Enable Camera</button>
     <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
     <canvas id="outputCanvas"></canvas>
@@ -77,9 +77,12 @@
                 const ids = new cv.Mat();
                 cv.aruco.detectMarkers(gray, arucoDict, corners, ids, arucoParams);
 
-                // Draw detected markers
+                // Debugging: Log marker IDs
                 if (!ids.empty()) {
+                    console.log("Detected ArUco markers:", ids.data32S);
                     cv.aruco.drawDetectedMarkers(src, corners, ids);
+                } else {
+                    console.log("No markers detected.");
                 }
 
                 // Display the frame
