@@ -3,27 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArUco Marker Detection</title>
+    <title>ArUco Marker Detection with Logs</title>
     <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
         video, canvas {
             width: 100%;
             height: auto;
         }
+        #logs {
+            height: 150px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+            font-size: 14px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-    <h1>ArUco Marker Detection v3</h1>
+    <h1>ArUco Marker Detection</h1>
     <button id="enableCameraButton">Enable Camera</button>
     <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
     <canvas id="outputCanvas"></canvas>
+    <div id="logs">
+        <strong>Logs:</strong>
+        <ul id="logList"></ul>
+    </div>
 
     <script>
         let video, canvas, ctx, streaming = false;
 
+        // Function to log messages visibly
+        function logMessage(message) {
+            const logList = document.getElementById("logList");
+            const logItem = document.createElement("li");
+            logItem.textContent = message;
+            logList.appendChild(logItem);
+            logList.scrollTop = logList.scrollHeight; // Auto-scroll to the latest log
+        }
+
         // Load OpenCV.js
         function onOpenCvReady() {
-            console.log("OpenCV.js is ready!");
+            logMessage("OpenCV.js is ready!");
         }
 
         const enableCameraButton = document.getElementById("enableCameraButton");
@@ -42,10 +70,10 @@
                 enableCameraButton.style.display = "none";
                 streaming = true;
 
-                // Start video feed processing
+                logMessage("Camera feed started.");
                 processVideo();
             } catch (error) {
-                console.error("Camera access error:", error);
+                logMessage(`Camera access error: ${error.message}`);
                 alert("Unable to access the camera. Please allow camera permissions in your browser.");
             }
         });
@@ -77,12 +105,12 @@
                 const ids = new cv.Mat();
                 cv.aruco.detectMarkers(gray, arucoDict, corners, ids, arucoParams);
 
-                // Debugging: Log marker IDs
                 if (!ids.empty()) {
-                    console.log("Detected ArUco markers:", ids.data32S);
+                    const detectedIds = Array.from(ids.data32S);
+                    logMessage(`Detected ArUco markers: ${detectedIds.join(", ")}`);
                     cv.aruco.drawDetectedMarkers(src, corners, ids);
                 } else {
-                    console.log("No markers detected.");
+                    logMessage("No markers detected.");
                 }
 
                 // Display the frame
@@ -98,6 +126,7 @@
                 if (!streaming) {
                     src.delete();
                     gray.delete();
+                    logMessage("Stopped video processing.");
                     return;
                 }
                 detectMarkers();
