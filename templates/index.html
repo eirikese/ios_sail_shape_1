@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Access Test</title>
+    <style>
+        video {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Camera Access Test</h1>
+    <button id="enableCameraButton">Enable Camera</button>
+    <video id="cameraFeed" autoplay playsinline muted></video>
+
+    <script>
+        const enableCameraButton = document.getElementById('enableCameraButton');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const BACKEND_URL = "http://<FLASK_BACKEND_IP>:5000"; // Replace with your backend's IP and port
+
+        enableCameraButton.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' } // Use rear camera
+                });
+                cameraFeed.srcObject = stream;
+                cameraFeed.style.display = 'block';
+                enableCameraButton.style.display = 'none';
+            } catch (error) {
+                console.error("Camera access error:", error);
+                alert("Unable to access the camera. Please allow camera permissions in your browser.");
+            }
+        });
+    </script>
+</body>
+</html>
