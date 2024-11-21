@@ -3,37 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Access Test</title>
+    <title>ArUco Marker Detection</title>
     <style>
-        video {
+        video, canvas {
             width: 100%;
             height: auto;
         }
     </style>
 </head>
 <body>
-    <h1>Camera Access Test</h1>
+    <h1>ArUco Marker Detection v1</h1>
     <button id="enableCameraButton">Enable Camera</button>
-    <video id="cameraFeed" autoplay playsinline muted></video>
+    <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
+    <canvas id="processedFeed"></canvas>
 
     <script>
-        const enableCameraButton = document.getElementById('enableCameraButton');
-        const cameraFeed = document.getElementById('cameraFeed');
-        const BACKEND_URL = "http://<FLASK_BACKEND_IP>:5000"; // Replace with your backend's IP and port
+        const enableCameraButton = document.getElementById("enableCameraButton");
+        const cameraFeed = document.getElementById("cameraFeed");
+        const processedFeed = document.getElementById("processedFeed");
+        const ctx = processedFeed.getContext("2d");
+        const BACKEND_URL = "http://<FLASK_BACKEND_IP>:5000/process_frame"; // Replace with Flask backend IP
 
-        enableCameraButton.addEventListener('click', async () => {
+        let streaming = false;
+
+        enableCameraButton.addEventListener("click", async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' } // Use rear camera
+                    video: { facingMode: "environment" }
                 });
                 cameraFeed.srcObject = stream;
-                cameraFeed.style.display = 'block';
-                enableCameraButton.style.display = 'none';
+                cameraFeed.style.display = "block";
+                enableCameraButton.style.display = "none";
+                streaming = true;
+
+                processFrames();
             } catch (error) {
                 console.error("Camera access error:", error);
                 alert("Unable to access the camera. Please allow camera permissions in your browser.");
             }
         });
+
+        async function processFrames() {
+            if (!streaming) return;
+
+            // Capture a frame from the video
+            const canvas = document.createElement("canvas");
+            canvas.width = cameraFeed.videoWidth;
+            canvas.height = cameraFeed.videoHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+
+            // Convert the frame to base64
+            const frameData = canvas.toDataURL("image/jpeg").split(",")[1];
+
+            // Send the frame to the backend
+            const response = await fetch(BACKEND_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ frame: frameData })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const img = new Image();
+                img.src = `data:image/jpeg;base64,${data.frame}`;
+                img.onload = () => {
+                    processedFeed.width = img.width;
+                    processedFeed.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                };
+            } else {
+                console.error("Error processing frame:", response.statusText);
+            }
+
+            // Process the next frame
+            requestAnimationFrame(processFrames);
+        }
     </script>
 </body>
 </html>
