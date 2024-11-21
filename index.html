@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArUco Marker Detection with Logs</title>
+    <title>ArUco Marker Detection with Orientation</title>
     <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <style>
         body {
@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-    <h1>ArUco Marker Detection</h1>
+    <h1>ArUco Marker Detection with Orientation</h1>
     <button id="enableCameraButton">Enable Camera</button>
     <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
     <canvas id="outputCanvas"></canvas>
@@ -38,7 +38,7 @@
     </div>
 
     <script>
-        let video, canvas, ctx, streaming = false;
+        let streaming = false;
 
         // Function to log messages visibly
         function logMessage(message) {
@@ -57,7 +57,7 @@
         const enableCameraButton = document.getElementById("enableCameraButton");
         const cameraFeed = document.getElementById("cameraFeed");
         const outputCanvas = document.getElementById("outputCanvas");
-        ctx = outputCanvas.getContext("2d");
+        const ctx = outputCanvas.getContext("2d");
 
         enableCameraButton.addEventListener("click", async () => {
             try {
@@ -88,11 +88,37 @@
             // Initialize OpenCV
             const src = new cv.Mat(outputCanvas.height, outputCanvas.width, cv.CV_8UC4);
             const gray = new cv.Mat();
+            const flipped = new cv.Mat();
             const arucoDict = new cv.aruco_Dictionary(cv.aruco.DICT_4X4_50);
             const arucoParams = new cv.aruco_DetectorParameters();
 
-            function detectMarkers() {
-                // Capture video frame
+            function detectMarkersWithOrientation(orientation) {
+                // Detect markers in the current orientation
+                const corners = new cv.MatVector();
+                const ids = new cv.Mat();
+                cv.aruco.detectMarkers(gray, arucoDict, corners, ids, arucoParams);
+
+                if (!ids.empty()) {
+                    const detectedIds = Array.from(ids.data32S);
+                    logMessage(`Detected ArUco markers: ${detectedIds.join(", ")} (Orientation: ${orientation})`);
+                    cv.aruco.drawDetectedMarkers(src, corners, ids);
+                }
+
+                // Cleanup
+                corners.delete();
+                ids.delete();
+            }
+
+            function processFrame() {
+                if (!streaming) {
+                    src.delete();
+                    gray.delete();
+                    flipped.delete();
+                    logMessage("Stopped video processing.");
+                    return;
+                }
+
+                // Capture the video frame
                 ctx.drawImage(cameraFeed, 0, 0, outputCanvas.width, outputCanvas.height);
                 const imageData = ctx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
                 src.data.set(imageData.data);
@@ -100,36 +126,24 @@
                 // Convert to grayscale
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-                // Detect markers
-                const corners = new cv.MatVector();
-                const ids = new cv.Mat();
-                cv.aruco.detectMarkers(gray, arucoDict, corners, ids, arucoParams);
+                // Original orientation
+                detectMarkersWithOrientation("Original");
 
-                if (!ids.empty()) {
-                    const detectedIds = Array.from(ids.data32S);
-                    logMessage(`Detected ArUco markers: ${detectedIds.join(", ")}`);
-                    cv.aruco.drawDetectedMarkers(src, corners, ids);
-                } else {
-                    logMessage("No markers detected.");
-                }
+                // Horizontal flip
+                cv.flip(gray, flipped, 1);
+                detectMarkersWithOrientation("Horizontally Flipped");
+
+                // Vertical flip
+                cv.flip(gray, flipped, 0);
+                detectMarkersWithOrientation("Vertically Flipped");
+
+                // Both flips
+                cv.flip(gray, flipped, -1);
+                detectMarkersWithOrientation("Both Flipped");
 
                 // Display the frame
                 cv.imshow("outputCanvas", src);
 
-                // Cleanup
-                corners.delete();
-                ids.delete();
-            }
-
-            // Process frames continuously
-            function processFrame() {
-                if (!streaming) {
-                    src.delete();
-                    gray.delete();
-                    logMessage("Stopped video processing.");
-                    return;
-                }
-                detectMarkers();
                 requestAnimationFrame(processFrame);
             }
             processFrame();
