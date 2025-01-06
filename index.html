@@ -4,10 +4,14 @@
     <title>Video Stream</title>
 </head>
 <body>
-    <h1>Phone Camera Stream</h1>
+    <h1>Processed Video Feed (Black & White)</h1>
     <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
     <script>
         const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
         // Access the device camera
         navigator.mediaDevices.getUserMedia({ video: true })
@@ -20,12 +24,26 @@
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
-                        // Send video data to the server
-                        fetch('http://192.168.10.167:5000/video_feed', {
-
-                            method: 'POST',
-                            body: event.data,
-                        }).catch(console.error);
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            fetch('http://192.168.10.167:5000/video_feed', {
+                                method: 'POST',
+                                body: reader.result,
+                                headers: { 'Content-Type': 'application/octet-stream' },
+                            })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                const processedImage = new Image();
+                                processedImage.src = 'data:image/jpeg;base64,' + data.processed_frame;
+                                processedImage.onload = () => {
+                                    canvas.width = processedImage.width;
+                                    canvas.height = processedImage.height;
+                                    ctx.drawImage(processedImage, 0, 0);
+                                };
+                            })
+                            .catch(console.error);
+                        };
+                        reader.readAsArrayBuffer(event.data);
                     }
                 };
 
