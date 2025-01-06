@@ -7,13 +7,24 @@
                  user-scalable=no, 
                  minimum-scale=1.0, 
                  maximum-scale=1.0" />
-  <title>Grayscale Video (Debug)</title>
+  <title>Grayscale Video with Configurable IP</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
 <body>
-  <h1>Grayscale Video (Debug Version)</h1>
-  
+  <h1>Grayscale Video (IP Config)</h1>
+
+  <!-- 
+    1) The user enters the server's IP address here.
+    2) Once "Set IP" is clicked, the code updates the API URL internally.
+    3) Then, "Start Camera" triggers the camera and processes frames using that URL.
+  -->
+  <div style="margin-bottom: 1em;">
+    <label for="ipInput">Server IP/Domain:</label>
+    <input type="text" id="ipInput" placeholder="e.g. 192.168.10.167" />
+    <button onclick="setApiUrl()">Set IP</button>
+  </div>
+
   <button id="startButton" onclick="startVideo()">Start Camera</button>
 
   <!-- iOS-specific attributes for inline video -->
@@ -22,7 +33,7 @@
     playsinline 
     webkit-playsinline 
     autoplay 
-    style="display:none;"
+    style="display: none;"
   ></video>
 
   <canvas id="canvas" width="640" height="480"></canvas>
@@ -31,46 +42,66 @@
     let video;
     let canvas;
     let ctx;
-    let processingInterval;
 
-    // This function sends a single frame to the server
+    // We'll store the final /process_frame API endpoint here
+    let apiEndpoint = '';
+
+    function setApiUrl() {
+      const ip = document.getElementById('ipInput').value.trim();
+      if (!ip) {
+        alert("Please enter a valid IP or domain name.");
+        return;
+      }
+
+      // For HTTPS on port 5000; adjust if needed:
+      apiEndpoint = `https://${ip}:5000/process_frame`;
+      console.log('[setApiUrl] API endpoint set to:', apiEndpoint);
+      alert(`API endpoint set to: ${apiEndpoint}`);
+    }
+
     async function processFrame() {
-      try {
-        console.log('[processFrame] Capturing a frame from the video element...');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert the canvas frame to JPEG Base64
-        const frame = canvas.toDataURL('image/jpeg');
-        console.log(`[processFrame] Base64 length: ${frame.length}`);
+      if (!apiEndpoint) {
+        console.error('[processFrame] API endpoint not set! Please enter IP and click "Set IP".');
+        return;
+      }
 
-        // Convert Base64 to binary data
-        const binaryFrame = atob(frame.split(',')[1]);
-        const arrayBuffer = new Uint8Array(binaryFrame.length);
-        for (let i = 0; i < binaryFrame.length; i++) {
-          arrayBuffer[i] = binaryFrame.charCodeAt(i);
+      try {
+        console.log('[processFrame] Capturing a frame from video...');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert the canvas content to a JPEG in Base64
+        const frameDataURL = canvas.toDataURL('image/jpeg');
+        console.log('[processFrame] frameDataURL length:', frameDataURL.length);
+
+        // Convert the Base64 to binary data
+        const binaryString = atob(frameDataURL.split(',')[1]);
+        const arrayBuffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          arrayBuffer[i] = binaryString.charCodeAt(i);
         }
-        console.log('[processFrame] Frame converted to binary array.');
+        console.log('[processFrame] Binary frame created, length:', arrayBuffer.length);
 
         // Send the frame to the Flask server
-        console.log('[processFrame] Sending frame to /process_frame endpoint...');
-        const response = await fetch('https://172.20.10.2:5000/process_frame', {
+        console.log('[processFrame] Sending frame to:', apiEndpoint);
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
           body: arrayBuffer
         });
 
         const data = await response.json();
-        console.log('[processFrame] Received response from API:', data);
+        console.log('[processFrame] Response from API:', data);
 
         if (response.ok && data.processed_frame) {
           const processedImageBase64 = data.processed_frame;
-          console.log(`[processFrame] Processed image base64 length: ${processedImageBase64.length}`);
+          console.log('[processFrame] Processed image base64 length:', processedImageBase64.length);
 
           // Create an image element for the processed frame
           const img = new Image();
           img.src = 'data:image/jpeg;base64,' + processedImageBase64;
+
           img.onload = () => {
-            console.log('[processFrame] Displaying processed grayscale image on canvas...');
+            console.log('[processFrame] Drawing processed grayscale image on canvas...');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           };
         } else {
@@ -81,7 +112,6 @@
       }
     }
 
-    // This function handles camera access on button click
     async function startVideo() {
       console.log('[startVideo] Attempting to access camera...');
       video = document.getElementById('video');
@@ -95,13 +125,12 @@
           audio: false
         });
         console.log('[startVideo] Camera access granted!');
-
         video.srcObject = stream;
+
         document.getElementById('startButton').style.display = 'none';
 
-        // Process frames at intervals
-        console.log('[startVideo] Starting setInterval for frame processing...');
-        processingInterval = setInterval(processFrame, 100);
+        // Process frames at intervals (100ms = 10 fps)
+        setInterval(processFrame, 100);
       } catch (err) {
         console.error('[startVideo] Error accessing camera:', err);
         alert('Failed to access camera. Please check permissions and reload the page.');
