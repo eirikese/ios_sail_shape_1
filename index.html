@@ -1,121 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArUco Marker Detection via Flask</title>
-    <style>
-        video, canvas {
-            width: 100%;
-            height: auto;
-        }
-        #logs {
-            height: 150px;
-            overflow-y: scroll;
-            border: 1px solid #ccc;
-            padding: 10px;
-            text-align: left;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-    </style>
+    <title>Video Stream</title>
 </head>
 <body>
-    <h1>ArUco Marker Detection via Flask Server</h1>
-    <button id="enableCameraButton">Enable Camera</button>
-    <video id="cameraFeed" autoplay playsinline muted style="display:none;"></video>
-    <canvas id="outputCanvas"></canvas>
-    <div id="logs">
-        <strong>Logs:</strong>
-        <ul id="logList"></ul>
-    </div>
-
+    <h1>Video Stream to Local Server</h1>
+    <video id="video" autoplay></video>
     <script>
-        const enableCameraButton = document.getElementById("enableCameraButton");
-        const cameraFeed = document.getElementById("cameraFeed");
-        const outputCanvas = document.getElementById("outputCanvas");
-        const ctx = outputCanvas.getContext("2d");
-        const BACKEND_URL = "http://172.20.10.2:5000/process_frame";
+        const video = document.getElementById('video');
+        const socket = new WebSocket('ws://localhost:8000/video-stream'); // Adjust to match local server
 
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
 
-        let streaming = false;
-
-        // Log messages visibly
-        function logMessage(message) {
-            const logList = document.getElementById("logList");
-            const logItem = document.createElement("li");
-            logItem.textContent = message;
-            logList.appendChild(logItem);
-            logList.scrollTop = logList.scrollHeight; // Auto-scroll to latest log
-        }
-
-        enableCameraButton.addEventListener("click", async () => {
-            try {
-                // Access the camera
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" }
-                });
-                cameraFeed.srcObject = stream;
-                cameraFeed.style.display = "block";
-                enableCameraButton.style.display = "none";
-                streaming = true;
-
-                logMessage("Camera feed started.");
-                processFrames();
-            } catch (error) {
-                logMessage(`Camera access error: ${error.message}`);
-                alert("Unable to access the camera. Please allow camera permissions in your browser.");
-            }
-        });
-
-        async function processFrames() {
-            if (!streaming) return;
-
-            // Set up canvas dimensions
-            outputCanvas.width = cameraFeed.videoWidth;
-            outputCanvas.height = cameraFeed.videoHeight;
-
-            const canvas = document.createElement("canvas");
-            const canvasCtx = canvas.getContext("2d");
-            canvas.width = cameraFeed.videoWidth;
-            canvas.height = cameraFeed.videoHeight;
-
-            async function sendFrameToServer() {
-                if (!streaming) return;
-
-                // Capture video frame
-                canvasCtx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
-                const frameData = canvas.toDataURL("image/jpeg").split(",")[1];
-
-                try {
-                    // Send frame to Flask server
-                    const response = await fetch(BACKEND_URL, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ frame: frameData })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        const img = new Image();
-                        img.src = `data:image/jpeg;base64,${data.frame}`;
-                        img.onload = () => {
-                            ctx.drawImage(img, 0, 0, outputCanvas.width, outputCanvas.height);
-                        };
-                        logMessage("Frame processed successfully.");
-                    } else {
-                        const errorData = await response.json();
-                        logMessage(`Error from server: ${errorData.error}`);
-                    }
-                } catch (error) {
-                    logMessage(`Error communicating with server: ${error.message}`);
-                }
-
-                requestAnimationFrame(sendFrameToServer);
-            }
-
-            sendFrameToServer();
-        }
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) socket.send(event.data); // Send video to server
+                };
+                mediaRecorder.start(100); // Stream data every 100ms
+            })
+            .catch(console.error);
     </script>
 </body>
 </html>
