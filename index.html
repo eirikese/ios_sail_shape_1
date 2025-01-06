@@ -3,33 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grayscale Video</title>
+    <title>Grayscale Video 2</title>
     <script>
         let video;
         let canvas;
         let ctx;
 
         async function processFrame() {
-            // Capture a single frame from the video
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
-
-            // Convert Base64 to binary data
-            const binaryFrame = atob(frame.split(',')[1]);
-            const arrayBuffer = new Uint8Array(binaryFrame.length);
-            for (let i = 0; i < binaryFrame.length; i++) {
-                arrayBuffer[i] = binaryFrame.charCodeAt(i);
-            }
-
             try {
-                // Send the frame to the API
-                const response = await fetch('http://192.168.10.167:5000/process_frame', { // Replace YOUR_PC_IP
+                // Capture a single frame from the video
+                console.log('Capturing frame'); // Debug log
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
+
+                // Convert Base64 to binary data
+                const binaryFrame = atob(frame.split(',')[1]);
+                const arrayBuffer = new Uint8Array(binaryFrame.length);
+                for (let i = 0; i < binaryFrame.length; i++) {
+                    arrayBuffer[i] = binaryFrame.charCodeAt(i);
+                }
+
+                console.log('Sending frame to API'); // Debug log
+
+                // Replace YOUR_PC_IP with your server's IP address
+                const response = await fetch('https://192.168.10.167:5000/process_frame', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/octet-stream' },
                     body: arrayBuffer,
                 });
 
                 const data = await response.json();
+                console.log('Received response from API:', data); // Debug log
 
                 if (response.ok && data.processed_frame) {
                     // Create an image element for the processed frame
@@ -49,12 +53,12 @@
         }
 
         async function startVideoProcessing() {
-            // Access the user's camera
             video = document.getElementById('video');
             canvas = document.getElementById('canvas');
             ctx = canvas.getContext('2d');
 
             try {
+                console.log('Accessing camera'); // Debug log
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
 
