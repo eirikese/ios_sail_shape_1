@@ -2,27 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" 
+  <meta name="viewport"
         content="width=device-width, initial-scale=1.0, 
                  user-scalable=no, 
                  minimum-scale=1.0, 
                  maximum-scale=1.0" />
-  <title>Grayscale Video (iOS Compatible)</title>
-  <!-- For iOS full-screen web app support -->
+  <title>Grayscale Video (Debug)</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
 <body>
-  <h1>Grayscale Video</h1>
-  <!-- We’ll start the camera on button click for iOS compatibility -->
-  <button id="startButton" onclick="startVideo()">Start Camera</button>
+  <h1>Grayscale Video (Debug Version)</h1>
   
-  <!-- Ensure the video tag has both playsinline and webkit-playsinline -->
-  <video id="video" 
-         playsinline 
-         webkit-playsinline 
-         autoplay 
-         style="display:none;"></video>
+  <button id="startButton" onclick="startVideo()">Start Camera</button>
+
+  <!-- iOS-specific attributes for inline video -->
+  <video 
+    id="video" 
+    playsinline 
+    webkit-playsinline 
+    autoplay 
+    style="display:none;"
+  ></video>
 
   <canvas id="canvas" width="640" height="480"></canvas>
 
@@ -32,12 +33,15 @@
     let ctx;
     let processingInterval;
 
+    // This function sends a single frame to the server
     async function processFrame() {
       try {
-        // Capture a single frame from the video
-        console.log('Capturing frame'); // Debug log
+        console.log('[processFrame] Capturing a frame from the video element...');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
+        
+        // Convert the canvas frame to JPEG Base64
+        const frame = canvas.toDataURL('image/jpeg');
+        console.log(`[processFrame] Base64 length: ${frame.length}`);
 
         // Convert Base64 to binary data
         const binaryFrame = atob(frame.split(',')[1]);
@@ -45,59 +49,62 @@
         for (let i = 0; i < binaryFrame.length; i++) {
           arrayBuffer[i] = binaryFrame.charCodeAt(i);
         }
+        console.log('[processFrame] Frame converted to binary array.');
 
-        console.log('Sending frame to API'); // Debug log
-        // Use your server IP/domain and port below
+        // Send the frame to the Flask server
+        console.log('[processFrame] Sending frame to /process_frame endpoint...');
         const response = await fetch('https://192.168.10.167:5000/process_frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
-          body: arrayBuffer,
+          body: arrayBuffer
         });
 
         const data = await response.json();
-        console.log('Received response from API:', data); // Debug log
+        console.log('[processFrame] Received response from API:', data);
 
         if (response.ok && data.processed_frame) {
+          const processedImageBase64 = data.processed_frame;
+          console.log(`[processFrame] Processed image base64 length: ${processedImageBase64.length}`);
+
           // Create an image element for the processed frame
           const img = new Image();
-          img.src = 'data:image/jpeg;base64,' + data.processed_frame;
-
+          img.src = 'data:image/jpeg;base64,' + processedImageBase64;
           img.onload = () => {
-            // Display the processed frame
+            console.log('[processFrame] Displaying processed grayscale image on canvas...');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           };
         } else {
-          console.error('Error from API:', data.error);
+          console.error('[processFrame] Error from API:', data.error);
         }
       } catch (error) {
-        console.error('Error in API call:', error);
+        console.error('[processFrame] Error in API call:', error);
       }
     }
 
+    // This function handles camera access on button click
     async function startVideo() {
+      console.log('[startVideo] Attempting to access camera...');
       video = document.getElementById('video');
       canvas = document.getElementById('canvas');
       ctx = canvas.getContext('2d');
 
-      // For iOS, must be triggered by a user gesture (the button click).
-      // We add { video: { facingMode: "user" } } to potentially use the front camera on iOS.
+      // For iOS, must be triggered by a user gesture
       try {
-        console.log('Accessing camera'); // Debug log
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "user" }, 
-          audio: false 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
         });
+        console.log('[startVideo] Camera access granted!');
 
         video.srcObject = stream;
-
-        // Hide the start button now that we have permissions
         document.getElementById('startButton').style.display = 'none';
 
-        // Process frames continuously, e.g. every 100ms
+        // Process frames at intervals
+        console.log('[startVideo] Starting setInterval for frame processing...');
         processingInterval = setInterval(processFrame, 100);
       } catch (err) {
-        console.error('Error accessing camera:', err);
-        alert('Failed to access camera. Please check permissions.');
+        console.error('[startVideo] Error accessing camera:', err);
+        alert('Failed to access camera. Please check permissions and reload the page.');
       }
     }
   </script>
