@@ -4,44 +4,36 @@
     <title>Video Stream</title>
 </head>
 <body>
-    <h1>Video Stream</h1>
-    <video id="localVideo" autoplay></video>
-    <img id="processedVideo" alt="Processed Video" />
-
+    <h1>Phone Camera Stream</h1>
+    <video id="video" autoplay playsinline></video>
     <script>
-        const localVideo = document.getElementById("localVideo");
-        const processedVideo = document.getElementById("processedVideo");
+        const video = document.getElementById('video');
 
-        // Set up WebSocket connection to server
-        const socket = new WebSocket("wss://abc123.ngrok.io/video-stream"); // Replace with ngrok URL
+        // Access the device camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
 
-        // Capture video from the user's camera
-        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-            localVideo.srcObject = stream;
+                const mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm; codecs=vp8',
+                });
 
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    socket.send(event.data); // Send video data to server
-                }
-            };
-            mediaRecorder.start(100); // Send data every 100ms
-        });
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        // Send video data to the server
+                        fetch('http://192.168.10.167:5000/video_feed', {
 
-        // Display processed video from the server
-        socket.onmessage = (event) => {
-            const blob = new Blob([event.data], { type: "image/jpeg" });
-            const url = URL.createObjectURL(blob);
-            processedVideo.src = url; // Update image with processed frame
-        };
+                            method: 'POST',
+                            body: event.data,
+                        }).catch(console.error);
+                    }
+                };
 
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
-
-        socket.onclose = () => {
-            console.log("WebSocket connection closed");
-        };
+                mediaRecorder.start(100); // Send frames every 100ms
+            })
+            .catch((err) => {
+                console.error('Camera access denied:', err);
+            });
     </script>
 </body>
 </html>
