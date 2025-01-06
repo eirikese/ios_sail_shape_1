@@ -1,57 +1,74 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Video Stream</title>
-</head>
-<body>
-    <h1>Processed Video Feed (Black & White)</h1>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grayscale Video</title>
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        let video;
+        let canvas;
+        let ctx;
 
-        // Access the device camera
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
+        async function processFrame() {
+            // Capture a single frame from the video
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
 
-                const mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm; codecs=vp8',
+            // Convert Base64 to binary data
+            const binaryFrame = atob(frame.split(',')[1]);
+            const arrayBuffer = new Uint8Array(binaryFrame.length);
+            for (let i = 0; i < binaryFrame.length; i++) {
+                arrayBuffer[i] = binaryFrame.charCodeAt(i);
+            }
+
+            try {
+                // Send the frame to the API
+                const response = await fetch('http://192.168.10.167:5000/process_frame', { // Replace YOUR_PC_IP
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: arrayBuffer,
                 });
 
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            fetch('http://192.168.10.167:5000/video_feed', {
-                                method: 'POST',
-                                body: reader.result,
-                                headers: { 'Content-Type': 'application/octet-stream' },
-                            })
-                            .then((response) => response.json())
-                            .then((data) => {
-                                const processedImage = new Image();
-                                processedImage.src = 'data:image/jpeg;base64,' + data.processed_frame;
-                                processedImage.onload = () => {
-                                    canvas.width = processedImage.width;
-                                    canvas.height = processedImage.height;
-                                    ctx.drawImage(processedImage, 0, 0);
-                                };
-                            })
-                            .catch(console.error);
-                        };
-                        reader.readAsArrayBuffer(event.data);
-                    }
-                };
+                const data = await response.json();
 
-                mediaRecorder.start(100); // Send frames every 100ms
-            })
-            .catch((err) => {
-                console.error('Camera access denied:', err);
-            });
+                if (response.ok && data.processed_frame) {
+                    // Create an image element for the processed frame
+                    const img = new Image();
+                    img.src = 'data:image/jpeg;base64,' + data.processed_frame;
+
+                    img.onload = () => {
+                        // Display the processed frame
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    };
+                } else {
+                    console.error('Error from API:', data.error);
+                }
+            } catch (error) {
+                console.error('Error in API call:', error);
+            }
+        }
+
+        async function startVideoProcessing() {
+            // Access the user's camera
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+
+                // Process frames continuously
+                setInterval(processFrame, 100); // Process a frame every 100ms
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+            }
+        }
     </script>
+</head>
+<body onload="startVideoProcessing()">
+    <h1>Grayscale Video</h1>
+    <video id="video" autoplay playsinline style="display: none;"></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
 </body>
 </html>
