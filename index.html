@@ -1,78 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grayscale Video 2</title>
-    <script>
-        let video;
-        let canvas;
-        let ctx;
-
-        async function processFrame() {
-            try {
-                // Capture a single frame from the video
-                console.log('Capturing frame'); // Debug log
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
-
-                // Convert Base64 to binary data
-                const binaryFrame = atob(frame.split(',')[1]);
-                const arrayBuffer = new Uint8Array(binaryFrame.length);
-                for (let i = 0; i < binaryFrame.length; i++) {
-                    arrayBuffer[i] = binaryFrame.charCodeAt(i);
-                }
-
-                console.log('Sending frame to API'); // Debug log
-
-                // Replace YOUR_PC_IP with your server's IP address
-                const response = await fetch('https://192.168.10.167:5000/process_frame', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/octet-stream' },
-                    body: arrayBuffer,
-                });
-
-                const data = await response.json();
-                console.log('Received response from API:', data); // Debug log
-
-                if (response.ok && data.processed_frame) {
-                    // Create an image element for the processed frame
-                    const img = new Image();
-                    img.src = 'data:image/jpeg;base64,' + data.processed_frame;
-
-                    img.onload = () => {
-                        // Display the processed frame
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    };
-                } else {
-                    console.error('Error from API:', data.error);
-                }
-            } catch (error) {
-                console.error('Error in API call:', error);
-            }
-        }
-
-        async function startVideoProcessing() {
-            video = document.getElementById('video');
-            canvas = document.getElementById('canvas');
-            ctx = canvas.getContext('2d');
-
-            try {
-                console.log('Accessing camera'); // Debug log
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-
-                // Process frames continuously
-                setInterval(processFrame, 100); // Process a frame every 100ms
-            } catch (err) {
-                console.error('Error accessing camera:', err);
-            }
-        }
-    </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" 
+        content="width=device-width, initial-scale=1.0, 
+                 user-scalable=no, 
+                 minimum-scale=1.0, 
+                 maximum-scale=1.0" />
+  <title>Grayscale Video (iOS Compatible)</title>
+  <!-- For iOS full-screen web app support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
-<body onload="startVideoProcessing()">
-    <h1>Grayscale Video</h1>
-    <video id="video" autoplay playsinline style="display: none;"></video>
-    <canvas id="canvas" width="640" height="480"></canvas>
+<body>
+  <h1>Grayscale Video</h1>
+  <!-- We’ll start the camera on button click for iOS compatibility -->
+  <button id="startButton" onclick="startVideo()">Start Camera</button>
+  
+  <!-- Ensure the video tag has both playsinline and webkit-playsinline -->
+  <video id="video" 
+         playsinline 
+         webkit-playsinline 
+         autoplay 
+         style="display:none;"></video>
+
+  <canvas id="canvas" width="640" height="480"></canvas>
+
+  <script>
+    let video;
+    let canvas;
+    let ctx;
+    let processingInterval;
+
+    async function processFrame() {
+      try {
+        // Capture a single frame from the video
+        console.log('Capturing frame'); // Debug log
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frame = canvas.toDataURL('image/jpeg'); // Convert to JPEG Base64
+
+        // Convert Base64 to binary data
+        const binaryFrame = atob(frame.split(',')[1]);
+        const arrayBuffer = new Uint8Array(binaryFrame.length);
+        for (let i = 0; i < binaryFrame.length; i++) {
+          arrayBuffer[i] = binaryFrame.charCodeAt(i);
+        }
+
+        console.log('Sending frame to API'); // Debug log
+        // Use your server IP/domain and port below
+        const response = await fetch('https://192.168.10.167:5000/process_frame', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: arrayBuffer,
+        });
+
+        const data = await response.json();
+        console.log('Received response from API:', data); // Debug log
+
+        if (response.ok && data.processed_frame) {
+          // Create an image element for the processed frame
+          const img = new Image();
+          img.src = 'data:image/jpeg;base64,' + data.processed_frame;
+
+          img.onload = () => {
+            // Display the processed frame
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          };
+        } else {
+          console.error('Error from API:', data.error);
+        }
+      } catch (error) {
+        console.error('Error in API call:', error);
+      }
+    }
+
+    async function startVideo() {
+      video = document.getElementById('video');
+      canvas = document.getElementById('canvas');
+      ctx = canvas.getContext('2d');
+
+      // For iOS, must be triggered by a user gesture (the button click).
+      // We add { video: { facingMode: "user" } } to potentially use the front camera on iOS.
+      try {
+        console.log('Accessing camera'); // Debug log
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user" }, 
+          audio: false 
+        });
+
+        video.srcObject = stream;
+
+        // Hide the start button now that we have permissions
+        document.getElementById('startButton').style.display = 'none';
+
+        // Process frames continuously, e.g. every 100ms
+        processingInterval = setInterval(processFrame, 100);
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        alert('Failed to access camera. Please check permissions.');
+      }
+    }
+  </script>
 </body>
 </html>
