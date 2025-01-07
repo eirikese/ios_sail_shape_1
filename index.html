@@ -2,12 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, 
-                 user-scalable=no, 
-                 minimum-scale=1.0, 
-                 maximum-scale=1.0" />
-  <title>Grayscale Video (Full Resolution)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Grayscale Video (iPhone Debug Fix)</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -20,6 +16,7 @@
     }
     #video, #canvas {
       width: 100%;
+      max-width: 640px;
       height: auto;
       margin: 1em auto;
     }
@@ -45,7 +42,7 @@
   </style>
 </head>
 <body>
-  <h1>Grayscale Video (Full Resolution)</h1>
+  <h1>Grayscale Video (iPhone Debug Fix)</h1>
 
   <div style="margin-bottom: 1em;">
     <label for="ipInput">Server IP/Domain:</label>
@@ -55,14 +52,7 @@
 
   <button id="startButton" onclick="startVideo()">Start Camera</button>
 
-  <video 
-    id="video" 
-    playsinline 
-    webkit-playsinline 
-    autoplay 
-    style="display: none;"
-  ></video>
-
+  <video id="video" playsinline webkit-playsinline autoplay style="display: none;"></video>
   <canvas id="canvas"></canvas>
 
   <script>
@@ -123,19 +113,27 @@
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true, // Request default resolution without restrictions
+          video: true,
           audio: false
         });
-
         video.srcObject = stream;
 
         video.onloadedmetadata = () => {
           video.style.display = 'block';
-          canvas.width = video.videoWidth; // Dynamically set canvas to video resolution
+          canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           document.getElementById('startButton').style.display = 'none';
 
-          setInterval(processFrame, 100); // Process frames every 100ms
+          // Ensure playback starts
+          video.play().catch(err => {
+            console.error('[startVideo] Error playing video:', err);
+            alert('Unable to start video playback. Please tap the screen.');
+          });
+
+          setInterval(() => {
+            console.log('[startVideo] Triggering processFrame...');
+            processFrame();
+          }, 100); // Process frames every 100ms
         };
       } catch (err) {
         console.error('[startVideo] Camera access error:', err);
