@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Grayscale Video (Debug Logging)</title>
+  <title>Canny Edge Detection</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -53,7 +53,7 @@
   </style>
 </head>
 <body>
-  <h1>Grayscale Video (Debug Logging)</h1>
+  <h1>Canny Edge Detection</h1>
 
   <div style="margin-bottom: 1em;">
     <label for="ipInput">Server IP/Domain:</label>
@@ -103,6 +103,7 @@
       try {
         isProcessing = true;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
         const frameDataURL = canvas.toDataURL('image/jpeg');
         logMessage(`[processFrame] Captured frame, size: ${frameDataURL.length} bytes`);
 
@@ -119,15 +120,24 @@
           body: arrayBuffer
         });
 
+        if (!response.ok) {
+          logMessage(`[processFrame] API returned an error: ${response.statusText}`);
+          return;
+        }
+
         const data = await response.json();
         logMessage(`[processFrame] API response received: ${JSON.stringify(data)}`);
 
-        if (response.ok && data.processed_frame) {
+        if (data.processed_frame) {
           const img = new Image();
           img.src = 'data:image/jpeg;base64,' + data.processed_frame;
-          img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            logMessage('[processFrame] Edge-detected image drawn on canvas.');
+          };
         } else {
-          logMessage(`[processFrame] API returned error: ${data.error}`);
+          logMessage('[processFrame] No processed_frame in API response.');
         }
       } catch (error) {
         logMessage(`[processFrame] API call error: ${error.message}`);
