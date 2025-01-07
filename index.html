@@ -7,18 +7,46 @@
                  user-scalable=no, 
                  minimum-scale=1.0, 
                  maximum-scale=1.0" />
-  <title>Grayscale Video with Configurable IP</title>
+  <title>Grayscale Video (Full Resolution)</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 1em;
+      text-align: center;
+    }
+    #video, #canvas {
+      width: 100%;
+      height: auto;
+      margin: 1em auto;
+    }
+    button, input {
+      font-size: 1em;
+      padding: 0.5em 1em;
+      margin: 0.5em 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-  <h1>Grayscale Video (IP Config ngrok2)</h1>
+  <h1>Grayscale Video (Full Resolution)</h1>
 
-  <!-- 
-    1) The user enters the server's IP address here.
-    2) Once "Set IP" is clicked, the code updates the API URL internally.
-    3) Then, "Start Camera" triggers the camera and processes frames using that URL.
-  -->
   <div style="margin-bottom: 1em;">
     <label for="ipInput">Server IP/Domain:</label>
     <input type="text" id="ipInput" placeholder="e.g. 192.168.10.167" />
@@ -27,7 +55,6 @@
 
   <button id="startButton" onclick="startVideo()">Start Camera</button>
 
-  <!-- iOS-specific attributes for inline video -->
   <video 
     id="video" 
     playsinline 
@@ -36,14 +63,12 @@
     style="display: none;"
   ></video>
 
-  <canvas id="canvas" width="640" height="480"></canvas>
+  <canvas id="canvas"></canvas>
 
   <script>
     let video;
     let canvas;
     let ctx;
-
-    // We'll store the final /process_frame API endpoint here
     let apiEndpoint = '';
 
     function setApiUrl() {
@@ -52,38 +77,26 @@
         alert("Please enter a valid IP or domain name.");
         return;
       }
-
-      // For HTTPS on port 5000; adjust if needed:
       apiEndpoint = `https://${ip}:5000/process_frame`;
-      // apiEndpoint = `https://8513-2a01-799-d96-9500-f54b-77ac-4294-5f5f.ngrok-free.app`;
       console.log('[setApiUrl] API endpoint set to:', apiEndpoint);
       alert(`API endpoint set to: ${apiEndpoint}`);
     }
 
     async function processFrame() {
       if (!apiEndpoint) {
-        console.error('[processFrame] API endpoint not set! Please enter IP and click "Set IP".');
+        console.error('[processFrame] API endpoint not set!');
         return;
       }
 
       try {
-        console.log('[processFrame] Capturing a frame from video...');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Convert the canvas content to a JPEG in Base64
         const frameDataURL = canvas.toDataURL('image/jpeg');
-        console.log('[processFrame] frameDataURL length:', frameDataURL.length);
-
-        // Convert the Base64 to binary data
         const binaryString = atob(frameDataURL.split(',')[1]);
         const arrayBuffer = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           arrayBuffer[i] = binaryString.charCodeAt(i);
         }
-        console.log('[processFrame] Binary frame created, length:', arrayBuffer.length);
 
-        // Send the frame to the Flask server
-        console.log('[processFrame] Sending frame to:', apiEndpoint);
         const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -91,49 +104,41 @@
         });
 
         const data = await response.json();
-        console.log('[processFrame] Response from API:', data);
-
         if (response.ok && data.processed_frame) {
-          const processedImageBase64 = data.processed_frame;
-          console.log('[processFrame] Processed image base64 length:', processedImageBase64.length);
-
-          // Create an image element for the processed frame
           const img = new Image();
-          img.src = 'data:image/jpeg;base64,' + processedImageBase64;
-
-          img.onload = () => {
-            console.log('[processFrame] Drawing processed grayscale image on canvas...');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          };
+          img.src = 'data:image/jpeg;base64,' + data.processed_frame;
+          img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         } else {
           console.error('[processFrame] Error from API:', data.error);
         }
       } catch (error) {
-        console.error('[processFrame] Error in API call:', error);
+        console.error('[processFrame] API call error:', error);
       }
     }
 
     async function startVideo() {
-      console.log('[startVideo] Attempting to access camera...');
       video = document.getElementById('video');
       canvas = document.getElementById('canvas');
       ctx = canvas.getContext('2d');
 
-      // For iOS, must be triggered by a user gesture
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
+          video: true, // Request default resolution without restrictions
           audio: false
         });
-        console.log('[startVideo] Camera access granted!');
+
         video.srcObject = stream;
 
-        document.getElementById('startButton').style.display = 'none';
+        video.onloadedmetadata = () => {
+          video.style.display = 'block';
+          canvas.width = video.videoWidth; // Dynamically set canvas to video resolution
+          canvas.height = video.videoHeight;
+          document.getElementById('startButton').style.display = 'none';
 
-        // Process frames at intervals (100ms = 10 fps)
-        setInterval(processFrame, 100);
+          setInterval(processFrame, 100); // Process frames every 100ms
+        };
       } catch (err) {
-        console.error('[startVideo] Error accessing camera:', err);
+        console.error('[startVideo] Camera access error:', err);
         alert('Failed to access camera. Please check permissions and reload the page.');
       }
     }
