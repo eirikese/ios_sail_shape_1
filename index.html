@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Grayscale Video (iPhone Debug Fix)</title>
+  <title>Grayscale Video (iPhone Fix)</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -42,7 +42,7 @@
   </style>
 </head>
 <body>
-  <h1>Grayscale Video (iPhone Debug Fix)</h1>
+  <h1>Grayscale Video (iPhone Fix)</h1>
 
   <div style="margin-bottom: 1em;">
     <label for="ipInput">Server IP/Domain:</label>
@@ -60,6 +60,7 @@
     let canvas;
     let ctx;
     let apiEndpoint = '';
+    let isProcessing = false;
 
     function setApiUrl() {
       const ip = document.getElementById('ipInput').value.trim();
@@ -73,12 +74,13 @@
     }
 
     async function processFrame() {
-      if (!apiEndpoint) {
-        console.error('[processFrame] API endpoint not set!');
+      if (isProcessing || !apiEndpoint) {
+        console.log('[processFrame] Skipping frame: API endpoint not set or already processing.');
         return;
       }
 
       try {
+        isProcessing = true;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const frameDataURL = canvas.toDataURL('image/jpeg');
         const binaryString = atob(frameDataURL.split(',')[1]);
@@ -103,6 +105,9 @@
         }
       } catch (error) {
         console.error('[processFrame] API call error:', error);
+      } finally {
+        isProcessing = false;
+        requestAnimationFrame(processFrame); // Continue processing
       }
     }
 
@@ -124,16 +129,13 @@
           canvas.height = video.videoHeight;
           document.getElementById('startButton').style.display = 'none';
 
-          // Ensure playback starts
-          video.play().catch(err => {
+          video.play().then(() => {
+            console.log('[startVideo] Video playback started.');
+            requestAnimationFrame(processFrame); // Start processing frames
+          }).catch(err => {
             console.error('[startVideo] Error playing video:', err);
             alert('Unable to start video playback. Please tap the screen.');
           });
-
-          setInterval(() => {
-            console.log('[startVideo] Triggering processFrame...');
-            processFrame();
-          }, 100); // Process frames every 100ms
         };
       } catch (err) {
         console.error('[startVideo] Camera access error:', err);
