@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Grayscale Video (iPhone Fix)</title>
+  <title>Grayscale Video (Debug Logging)</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -39,10 +39,21 @@
     button:hover:not(:disabled) {
       background-color: #0056b3;
     }
+    #log {
+      margin-top: 1em;
+      font-family: monospace;
+      font-size: 0.9em;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1em;
+      max-height: 200px;
+      overflow-y: auto;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
-  <h1>Grayscale Video (iPhone Fix)</h1>
+  <h1>Grayscale Video (Debug Logging)</h1>
 
   <div style="margin-bottom: 1em;">
     <label for="ipInput">Server IP/Domain:</label>
@@ -55,12 +66,22 @@
   <video id="video" playsinline webkit-playsinline autoplay style="display: none;"></video>
   <canvas id="canvas"></canvas>
 
+  <div id="log">Debug Log:</div>
+
   <script>
     let video;
     let canvas;
     let ctx;
     let apiEndpoint = '';
     let isProcessing = false;
+
+    function logMessage(message) {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toISOString();
+      logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+      logDiv.scrollTop = logDiv.scrollHeight; // Auto-scroll to latest log
+      console.log(message);
+    }
 
     function setApiUrl() {
       const ip = document.getElementById('ipInput').value.trim();
@@ -69,13 +90,13 @@
         return;
       }
       apiEndpoint = `https://${ip}:5000/process_frame`;
-      console.log('[setApiUrl] API endpoint set to:', apiEndpoint);
+      logMessage(`[setApiUrl] API endpoint set to: ${apiEndpoint}`);
       alert(`API endpoint set to: ${apiEndpoint}`);
     }
 
     async function processFrame() {
       if (isProcessing || !apiEndpoint) {
-        console.log('[processFrame] Skipping frame: API endpoint not set or already processing.');
+        logMessage('[processFrame] Skipping frame: API endpoint not set or already processing.');
         return;
       }
 
@@ -83,11 +104,14 @@
         isProcessing = true;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const frameDataURL = canvas.toDataURL('image/jpeg');
+        logMessage(`[processFrame] Captured frame, size: ${frameDataURL.length} bytes`);
+
         const binaryString = atob(frameDataURL.split(',')[1]);
         const arrayBuffer = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           arrayBuffer[i] = binaryString.charCodeAt(i);
         }
+        logMessage(`[processFrame] Converted frame to binary, size: ${arrayBuffer.length} bytes`);
 
         const response = await fetch(apiEndpoint, {
           method: 'POST',
@@ -96,15 +120,17 @@
         });
 
         const data = await response.json();
+        logMessage(`[processFrame] API response received: ${JSON.stringify(data)}`);
+
         if (response.ok && data.processed_frame) {
           const img = new Image();
           img.src = 'data:image/jpeg;base64,' + data.processed_frame;
           img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         } else {
-          console.error('[processFrame] Error from API:', data.error);
+          logMessage(`[processFrame] API returned error: ${data.error}`);
         }
       } catch (error) {
-        console.error('[processFrame] API call error:', error);
+        logMessage(`[processFrame] API call error: ${error.message}`);
       } finally {
         isProcessing = false;
         requestAnimationFrame(processFrame); // Continue processing
@@ -130,15 +156,15 @@
           document.getElementById('startButton').style.display = 'none';
 
           video.play().then(() => {
-            console.log('[startVideo] Video playback started.');
+            logMessage('[startVideo] Video playback started.');
             requestAnimationFrame(processFrame); // Start processing frames
           }).catch(err => {
-            console.error('[startVideo] Error playing video:', err);
+            logMessage(`[startVideo] Error playing video: ${err.message}`);
             alert('Unable to start video playback. Please tap the screen.');
           });
         };
       } catch (err) {
-        console.error('[startVideo] Camera access error:', err);
+        logMessage(`[startVideo] Camera access error: ${err.message}`);
         alert('Failed to access camera. Please check permissions and reload the page.');
       }
     }
